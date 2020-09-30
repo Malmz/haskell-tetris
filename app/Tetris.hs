@@ -1,8 +1,11 @@
+-- Authors: Carl Malmgren, Hannes Kaulio, Hampus de Flon
+-- Grupp 16
+
 -- | The Tetris game (main module)
 module Main where
 
 import ConsoleGUI -- cabal install ansi-terminal
---import CodeWorldGUI     -- cabal install codeworld-api
+--import CodeWorldGUI -- cabal install codeworld-api
 import Shapes
 import Test.QuickCheck
 
@@ -58,18 +61,40 @@ vAdd :: Vector -> Vector -> Vector
 place :: (Vector, Shape) -> Shape
 place (v, s) = shiftShape v s
 
+-- ** B4
+
 -- | An invariant that startTetris and stepTetris should uphold
 prop_Tetris :: Tetris -> Bool
-prop_Tetris t = True -- incomplete !!!
+prop_Tetris (Tetris (_, fall) well _) = prop_Shape fall && shapeSize well == wellSize
+
+-- ** B5
 
 -- | Add black walls around a shape
 addWalls :: Shape -> Shape
-addWalls s = s -- incomplete !!!
+addWalls = flipShape . wall . flipShape . wall
+  where
+    top r = replicate (shapeWidth (S r)) (Just Black) : r
+    right = map (Just Black :)
+    wall = S . top . right . rows
+
+-- ** B6
 
 -- | Visualize the current game state. This is what the user will see
 -- when playing the game.
 drawTetris :: Tetris -> Shape
-drawTetris (Tetris (v, p) w _) = w -- incomplete !!!
+drawTetris (Tetris (v, p) w _) = addWalls x
+  where
+    s = shiftShape v p
+    x = combine s w
+
+{- Draws the fallen pieces too, but that's not required yet
+drawTetris' :: Tetris -> Shape
+drawTetris' (Tetris (v, f) w g) = addWalls $ shifted `combine` foldr combine w g
+  where
+    shifted = shiftShape v f
+ -}
+
+-- ** B6 End
 
 -- | The initial game state
 startTetris :: [Double] -> Tetris
@@ -78,6 +103,21 @@ startTetris rs = Tetris (startPosition, shape1) (emptyShape wellSize) supply
     shape1 : supply = repeat (allShapes !! 1) -- incomplete !!!
 
 -- | React to input. The function returns 'Nothing' when it's game over,
--- and @'Just' (n,t)@, when the game continues in a new state @t@.
+-- otherwise it returns the next state.
 stepTetris :: Action -> Tetris -> Maybe (Int, Tetris)
-stepTetris _ t = Just (0, t) -- incomplete !!!
+stepTetris Tick t = tick t
+stepTetris _ t = Just (0, t)
+
+-- ** B7
+
+-- | Move the falling piece
+move :: Vector -> Tetris -> Tetris
+move v (Tetris (a, s) w g) = Tetris (u, s) w g
+  where
+    u = vAdd v a
+
+-- ** B8
+
+-- | Handles the Tick action, calculates a new veritical position for the active piece
+tick :: Tetris -> Maybe (Int, Tetris)
+tick t = Just (0, move (0, 1) t)

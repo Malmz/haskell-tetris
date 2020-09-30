@@ -1,3 +1,6 @@
+-- Authors: Carl Malmgren, Hannes Kaulio, Hampus de Flon
+-- Grupp 16
+
 -- | Types and functions for shapes. The list of all tetris pieces.
 module Shapes where
 
@@ -245,18 +248,46 @@ padShapeTo (x, y) s
 -- ** B1
 
 -- | Test if two shapes overlap
+rowsOverlap :: Row -> Row -> Bool
+rowsOverlap r1 r2 = or $ map (\(x, y) -> isJust x && isJust y) $ zip r1 r2
+
 overlaps :: Shape -> Shape -> Bool
-s1 `overlaps` s2 = error "A11 overlaps undefined"
+overlaps (S s1) (S s2) = or $ map (\(x, y) -> rowsOverlap x y) $ zip s1 s2
 
 -- ** B2
 
 -- | zipShapeWith, like 'zipWith' for lists
 zipShapeWith :: (Square -> Square -> Square) -> Shape -> Shape -> Shape
-zipShapeWith = error "A12 zipShapeWith undefined"
+zipShapeWith f (S s1) (S s2) = S $ zipWith (zipWith f) s1 s2
+
+blackClashes :: Shape -> Shape -> Shape
+blackClashes s1 s2 = zipShapeWith clash s1 s2
+  where
+    clash :: Square -> Square -> Square
+    clash Nothing Nothing = Nothing
+    clash Nothing s = s
+    clash s Nothing = s
+    clash (Just c1) (Just c2) = Just Black
 
 -- ** B3
+
+-- Union of non-overlapping squares
+merge :: Square -> Square -> Square
+merge Nothing Nothing = Nothing
+merge Nothing s = s
+merge s Nothing = s
+merge _ _ = error "Shape overlap"
 
 -- | Combine two shapes. The two shapes should not overlap.
 -- The resulting shape will be big enough to fit both shapes.
 combine :: Shape -> Shape -> Shape
-s1 `combine` s2 = error "A13 zipShapeWith undefined"
+combine s1 s2
+  | overlaps s1 s2 = error "Overlap occured!"
+  | otherwise = zipShapeWith merge p1 p2
+  where
+    size =
+      let (w1, h1) = shapeSize s1
+          (w2, h2) = shapeSize s2
+       in (max w1 w2, max h1 h2)
+    p1 = padShapeTo size s1
+    p2 = padShapeTo size s2
