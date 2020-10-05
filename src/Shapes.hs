@@ -185,12 +185,11 @@ rotateShape' = S . transpose . reverse . rows
 
 -- Adds empty lines to the left of the shape
 shiftRight :: Int -> Shape -> Shape
-shiftRight 0 s = s
-shiftRight i s = S $ map (Nothing :) $ rows $ shiftRight (i -1) s
+shiftRight i = S . map (replicate i Nothing ++) . rows
 
 -- Adds empty lines above the shape
 shiftDown :: Int -> Shape -> Shape
-shiftDown i (S s) = S $ replicate i (emptyRow (shapeWidth (S s))) ++ s
+shiftDown i s = S $ replicate i (emptyRow (shapeWidth s)) ++ rows s
 
 {- Alternative
 shiftDown' :: Int -> Shape -> Shape
@@ -206,7 +205,7 @@ shiftShape (x, y) s = shiftDown y (shiftRight x s)
 
 -- | Rotate shape 180 degrees
 flipShape :: Shape -> Shape
-flipShape = S . reverse . map reverse . rows
+flipShape = rotateShape . rotateShape
 
 -- | Add empty lines below and to the right of the shape
 padShape :: (Int, Int) -> Shape -> Shape
@@ -228,7 +227,7 @@ padShape' (x, y) s = shiftUp y (shiftLeft x s)
 
 -- | Pad a shape to a given size
 padShapeTo :: (Int, Int) -> Shape -> Shape
-padShapeTo (x, y) s = padShape (max (x - w) 0, max (y - h) 0) s
+padShapeTo (x, y) s = padShape (x - w, y - h) s
   where
     (w, h) = shapeSize s
 
@@ -252,7 +251,7 @@ rowsOverlap :: Row -> Row -> Bool
 rowsOverlap r1 r2 = or $ map (\(x, y) -> isJust x && isJust y) $ zip r1 r2
 
 overlaps :: Shape -> Shape -> Bool
-overlaps (S s1) (S s2) = or $ map (\(x, y) -> rowsOverlap x y) $ zip s1 s2
+overlaps (S s1) (S s2) = or $ map (uncurry rowsOverlap) $ zip s1 s2
 
 -- ** B2
 

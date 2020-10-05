@@ -82,17 +82,13 @@ addWalls = flipShape . wall . flipShape . wall
 -- | Visualize the current game state. This is what the user will see
 -- when playing the game.
 drawTetris :: Tetris -> Shape
-drawTetris (Tetris (v, p) w _) = addWalls x
+drawTetris (Tetris f w _) = addWalls $ place f `combine` w
+
+drawTetris' :: Tetris -> Shape
+drawTetris' (Tetris (v, p) w _) = addWalls x
   where
     s = shiftShape v p
     x = combine s w
-
-{- Draws the fallen pieces too, but that's not required yet
-drawTetris' :: Tetris -> Shape
-drawTetris' (Tetris (v, f) w g) = addWalls $ shifted `combine` foldr combine w g
-  where
-    shifted = shiftShape v f
- -}
 
 -- ** B6 End
 
@@ -106,6 +102,10 @@ startTetris rs = Tetris (startPosition, shape1) (emptyShape wellSize) supply
 -- otherwise it returns the next state.
 stepTetris :: Action -> Tetris -> Maybe (Int, Tetris)
 stepTetris Tick t = tick t
+stepTetris MoveDown t = tick t
+stepTetris MoveLeft t = return (0, movePiece (-1) t)
+stepTetris MoveRight t = return (0, movePiece 1 t)
+stepTetris Rotate t = return (0, rotatePiece t)
 stepTetris _ t = Just (0, t)
 
 -- ** B7
@@ -120,4 +120,68 @@ move v (Tetris (a, s) w g) = Tetris (u, s) w g
 
 -- | Handles the Tick action, calculates a new veritical position for the active piece
 tick :: Tetris -> Maybe (Int, Tetris)
-tick t = Just (0, move (0, 1) t)
+tick t
+  | collision t = return (0, t)
+  | otherwise = return (0, move (0, 1) t)
+
+collision :: Tetris -> Bool
+collision (Tetris f@((x, y), s) w _) =
+  x < 0
+    || x + sW > wellWidth
+    || y + sH >= wellHeight
+    || overlaps (place f) w
+  where
+    (sW, sH) = shapeSize s
+
+tryCollide :: (Tetris -> Tetris) -> Tetris -> Tetris
+tryCollide f t
+  | collision n = t
+  | otherwise = n
+  where
+    n = f t
+
+{-
+collision' :: Tetris -> Bool
+collision' (Tetris f w _) = place f `overlaps` w || outside f
+  where
+    outside ((x, y), s) =
+      let (w, h) = shapeSize s
+          (ww, wh) = wellSize
+       in x < 0 || x + w > ww || y < 0 || y + h > wh - 1
+ -}
+
+{-
+movePiece :: Int -> Tetris -> Tetris
+movePiece h t
+  | collision n = t
+  | otherwise = n
+  where
+    n = (move (h, 0) t)
+ -}
+
+movePiece :: Int -> Tetris -> Tetris
+movePiece h = tryCollide (move (h, 0))
+
+rotate :: Tetris -> Tetris
+rotate (Tetris (f, s) w r) = Tetris (f, rotateShape s) w r
+
+clamp :: Int -> Int -> Int -> Int
+clamp mi ma x = max mi $ min ma x
+
+adjust :: Tetris -> Tetris
+adjust (Tetris ((x, y), s) w r) = Tetris ((clamp 0 (wellWidth - shapeWidth s) x, y), s) w r
+
+{-
+rotatePiece :: Tetris -> Tetris
+rotatePiece t
+  | collision f = t
+  | otherwise = f
+  where
+    f = adjust (rotate t)
+ -}
+
+rotatePiece :: Tetris -> Tetris
+rotatePiece = tryCollide (adjust . rotate)
+
+dropNewPiece :: Tetris -> Maybe (Int, Tetris)
+dropNewPiece = undefined
