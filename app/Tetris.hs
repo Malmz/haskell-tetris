@@ -6,6 +6,7 @@ module Main where
 
 import ConsoleGUI -- cabal install ansi-terminal
 --import CodeWorldGUI -- cabal install codeworld-api
+import Data.Maybe (isJust)
 import Shapes
 import Test.QuickCheck
 
@@ -92,11 +93,13 @@ drawTetris' (Tetris (v, p) w _) = addWalls x
 
 -- ** B6 End
 
+-- ** C8
+
 -- | The initial game state
 startTetris :: [Double] -> Tetris
 startTetris rs = Tetris (startPosition, shape1) (emptyShape wellSize) supply
   where
-    shape1 : supply = repeat (allShapes !! 1) -- incomplete !!!
+    shape1 : supply = map (\r -> allShapes !! (floor $ r * fromIntegral (length allShapes))) rs
 
 -- | React to input. The function returns 'Nothing' when it's game over,
 -- otherwise it returns the next state.
@@ -106,7 +109,6 @@ stepTetris MoveDown t = tick t
 stepTetris MoveLeft t = return (0, movePiece (-1) t)
 stepTetris MoveRight t = return (0, movePiece 1 t)
 stepTetris Rotate t = return (0, rotatePiece t)
-stepTetris _ t = Just (0, t)
 
 -- ** B7
 
@@ -121,15 +123,28 @@ move v (Tetris (a, s) w g) = Tetris (u, s) w g
 -- | Handles the Tick action, calculates a new veritical position for the active piece
 tick :: Tetris -> Maybe (Int, Tetris)
 tick t
-  | collision t = return (0, t)
+  | collision n = dropNewPiece t
+  | otherwise = return (0, n)
+  where
+    n = move (0, 1) t
+
+{-
+tick' :: Tetris -> Maybe (Int, Tetris)
+tick' (Tetris ((x, y), s) w rs)
+  | collision $ Tetris ((x, y -1), s) w rs = dropNewPiece t --return (0, t)
   | otherwise = return (0, move (0, 1) t)
+  where
+    t = Tetris ((x, y), s) w rs
+ -}
+
+-- ** C1
 
 collision :: Tetris -> Bool
 collision (Tetris f@((x, y), s) w _) =
   x < 0
     || x + sW > wellWidth
-    || y + sH >= wellHeight
-    || overlaps (place f) w
+    || y + sH > wellHeight
+    || place f `overlaps` w
   where
     (sW, sH) = shapeSize s
 
@@ -140,30 +155,17 @@ tryCollide f t
   where
     n = f t
 
-{-
-collision' :: Tetris -> Bool
-collision' (Tetris f w _) = place f `overlaps` w || outside f
-  where
-    outside ((x, y), s) =
-      let (w, h) = shapeSize s
-          (ww, wh) = wellSize
-       in x < 0 || x + w > ww || y < 0 || y + h > wh - 1
- -}
-
-{-
-movePiece :: Int -> Tetris -> Tetris
-movePiece h t
-  | collision n = t
-  | otherwise = n
-  where
-    n = (move (h, 0) t)
- -}
+-- ** C2
 
 movePiece :: Int -> Tetris -> Tetris
 movePiece h = tryCollide (move (h, 0))
 
+-- ** C4
+
 rotate :: Tetris -> Tetris
 rotate (Tetris (f, s) w r) = Tetris (f, rotateShape s) w r
+
+-- ** C5
 
 clamp :: Int -> Int -> Int -> Int
 clamp mi ma x = max mi $ min ma x
@@ -171,17 +173,32 @@ clamp mi ma x = max mi $ min ma x
 adjust :: Tetris -> Tetris
 adjust (Tetris ((x, y), s) w r) = Tetris ((clamp 0 (wellWidth - shapeWidth s) x, y), s) w r
 
-{-
-rotatePiece :: Tetris -> Tetris
-rotatePiece t
-  | collision f = t
-  | otherwise = f
-  where
-    f = adjust (rotate t)
- -}
+-- ** C6
 
 rotatePiece :: Tetris -> Tetris
 rotatePiece = tryCollide (adjust . rotate)
 
+-- ** C7
+
 dropNewPiece :: Tetris -> Maybe (Int, Tetris)
-dropNewPiece = undefined
+dropNewPiece (Tetris (x, s) w (r : rs))
+  | overlaps (place nextPiece) newWell = Nothing
+  | otherwise = Just (count, (Tetris nextPiece newWell rs))
+  where
+    nextPiece = (startPosition, r)
+    combined = (place (x, s)) `combine` w
+    (count, newWell) = clearLines combined
+
+-- ** C9
+
+clearLines :: Shape -> (Int, Shape)
+clearLines s = (count s, shiftShapeTo $ remove s)
+  where
+    count = length . filter isComplete . rows
+    remove = S . filter (not . isComplete) . rows
+    shiftShapeTo sx = let (w, h) = shapeSize sx in shiftShape (wellWidth - w, wellHeight - h) sx
+
+isComplete :: Row -> Bool
+isComplete r = length (filter isJust r) >= wellWidth
+
+-- ** C10
