@@ -128,58 +128,58 @@ tick t
   where
     n = move (0, 1) t
 
-{-
-tick' :: Tetris -> Maybe (Int, Tetris)
-tick' (Tetris ((x, y), s) w rs)
-  | collision $ Tetris ((x, y -1), s) w rs = dropNewPiece t --return (0, t)
-  | otherwise = return (0, move (0, 1) t)
-  where
-    t = Tetris ((x, y), s) w rs
- -}
-
 -- ** C1
 
 collision :: Tetris -> Bool
 collision (Tetris f@((x, y), s) w _) =
-  x < 0
-    || x + sW > wellWidth
-    || y + sH > wellHeight
-    || place f `overlaps` w
+  x < 0 -- checks if the shape is inside the left wellWall
+    || x + sW > wellWidth --The piece has moved too far to the right
+    || y + sH > wellHeight --The piece has moved too far down
+    || place f `overlaps` w --The piece overlaps with something in the well.
   where
-    (sW, sH) = shapeSize s
+    (sW, sH) = shapeSize s -- (shape width, shape height)
 
+-- | Try to apply 'f' and return new state if no collision happened.
 tryCollide :: (Tetris -> Tetris) -> Tetris -> Tetris
 tryCollide f t
-  | collision n = t
-  | otherwise = n
+  | collision n = t -- incase of collision, return old state
+  | otherwise = n -- else returns new state
   where
     n = f t
 
 -- ** C2
 
+-- | Moves the piece right or left checks with tryCollide to prevent collision.
 movePiece :: Int -> Tetris -> Tetris
 movePiece h = tryCollide (move (h, 0))
 
 -- ** C4
 
+-- |  Rotates the falling shape.
 rotate :: Tetris -> Tetris
 rotate (Tetris (f, s) w r) = Tetris (f, rotateShape s) w r
 
 -- ** C5
 
+-- | A helper function that puts x inside the intervall of  mi <= x <= ma.
 clamp :: Int -> Int -> Int -> Int
 clamp mi ma x = max mi $ min ma x
 
+-- | Push the falling piece back
+-- in the play area if out-of-bounds.
 adjust :: Tetris -> Tetris
 adjust (Tetris ((x, y), s) w r) = Tetris ((clamp 0 (wellWidth - shapeWidth s) x, y), s) w r
 
 -- ** C6
 
+-- | Try to rotate the falling piece.
 rotatePiece :: Tetris -> Tetris
 rotatePiece = tryCollide (adjust . rotate)
 
--- ** C7
+-- ** C7, C10
 
+-- | Settles the current falling piece
+-- and drops the next one on the pile.
 dropNewPiece :: Tetris -> Maybe (Int, Tetris)
 dropNewPiece (Tetris (x, s) w (r : rs))
   | overlaps (place nextPiece) newWell = Nothing
@@ -191,6 +191,7 @@ dropNewPiece (Tetris (x, s) w (r : rs))
 
 -- ** C9
 
+-- | Clears and counts full lines.
 clearLines :: Shape -> (Int, Shape)
 clearLines s = (count s, shiftShapeTo $ remove s)
   where
@@ -198,7 +199,6 @@ clearLines s = (count s, shiftShapeTo $ remove s)
     remove = S . filter (not . isComplete) . rows
     shiftShapeTo sx = let (w, h) = shapeSize sx in shiftShape (wellWidth - w, wellHeight - h) sx
 
+-- | Is a line full.
 isComplete :: Row -> Bool
 isComplete r = length (filter isJust r) >= wellWidth
-
--- ** C10
